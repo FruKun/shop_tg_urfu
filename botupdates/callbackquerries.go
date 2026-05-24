@@ -1,0 +1,110 @@
+package botupdates
+
+import (
+	"fmt"
+	"log"
+	"strconv"
+	"strings"
+
+	"github.com/FruKun/shop_tg_bot_urfu/keyboard"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+)
+
+func (h *Handler) callbackAnswer(callback *tgbotapi.CallbackQuery, str string) {
+	if _, err := h.bot.Request(tgbotapi.NewCallback(callback.ID, str)); err != nil {
+		log.Println(err)
+	}
+
+}
+func (h *Handler) catalogPage(callback *tgbotapi.CallbackQuery) {
+	page, _ := strconv.Atoi(strings.TrimPrefix(callback.Data, "catalog_page_"))
+	products, err := h.storage.GetAllProduct()
+
+	var msg tgbotapi.MessageConfig
+	msg.ReplyMarkup = keyboard.MainMenu()
+
+	if err != nil {
+		log.Println(err)
+		msg = tgbotapi.NewMessage(callback.Message.Chat.ID, "ошибка загрузки")
+		h.bot.Send(msg)
+		return
+	}
+
+	if len(products) == 0 {
+		msg = tgbotapi.NewMessage(callback.Message.Chat.ID, "товаров нет")
+		h.bot.Send(msg)
+		return
+	}
+
+	itemsPerPage := 5
+	totalPages := (len(products) + itemsPerPage - 1) / itemsPerPage
+
+	start := min(page*itemsPerPage, len(products))
+	end := min(start+itemsPerPage, len(products))
+	if start == end {
+		start = max(start-itemsPerPage, 0)
+		page = max(page-1, 0)
+	}
+
+	var text strings.Builder
+	for i, product := range products[start:end] {
+		fmt.Fprintf(&text, "%d. %s\nЦена: %.2f руб.\n%s\nВ наличии: %d\n\n",
+			i+1, product.Name, product.Price, product.Description, product.Quantity)
+	}
+	fmt.Fprintf(&text, "сраница %d из %d\n", page+1, totalPages)
+
+	editMsg := tgbotapi.NewEditMessageTextAndMarkup(callback.Message.Chat.ID, callback.Message.MessageID, text.String(), keyboard.CatalogMenu(page, totalPages, products))
+
+	h.bot.Send(editMsg)
+	h.callbackAnswer(callback, "done")
+}
+
+func (h *Handler) product_description(callback *tgbotapi.CallbackQuery) {
+	id, _ := strconv.Atoi(strings.TrimPrefix(callback.Data, "product_description_"))
+	Id := int64(id)
+
+	product, err := h.storage.GetProduct(Id)
+	if err != nil {
+		h.callbackAnswer(callback, "что-то пошло не так")
+	}
+
+	text := fmt.Sprintf("%s\nЦена: %.2f руб.\n%s\nВ наличии: %d\n\n",
+		product.Name, product.Price, product.Description, product.Quantity)
+
+	var path string
+	if product.ImageUrl == "" {
+		path = "./uploads/not_found.jpg"
+	} else {
+		path = "." + product.ImageUrl
+	}
+
+	msg := tgbotapi.NewPhoto(callback.Message.Chat.ID, tgbotapi.FilePath(path))
+	msg.Caption = text
+	msg.ReplyMarkup = keyboard.ProductCartAddKeyboard(Id)
+	h.bot.Send(msg)
+	h.callbackAnswer(callback, "done")
+}
+
+func (h *Handler) cart_add(callback *tgbotapi.CallbackQuery) {
+	id, _ := strconv.Atoi(strings.TrimPrefix(callback.Data, "cart_add_"))
+	err := h.storage.AddToCart(callback.From.ID, id, 1)
+	if err != nil {
+		log.Println(err)
+		h.bot.Send(tgbotapi.NewMessage(callback.From.ID, "something go wrong"))
+	}
+	h.callbackAnswer(callback, "done")
+}
+
+func (h *Handler) cart_menu_order(callback *tgbotapi.CallbackQuery) {
+	h.storage.ClearCart(callback.From.ID)
+	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "заказ оформлен")
+	h.bot.Send(editMsg)
+	h.callbackAnswer(callback, "done")
+}
+
+func (h *Handler) cart_menu_clear_all(callback *tgbotapi.CallbackQuery) {
+	h.storage.ClearCart(callback.From.ID)
+	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "корзина пуста")
+	h.bot.Send(editMsg)
+	h.callbackAnswer(callback, "done")
+}

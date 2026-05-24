@@ -1,0 +1,6 @@
+.git
+uploads/*
+!uploads/not_found.jpg
+*.db
+cmd/*
+!cmd/main.go
