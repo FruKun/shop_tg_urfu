@@ -15,11 +15,11 @@ type Config struct {
 func New() *Config {
 	return &Config{
 		BotToken:      os.Getenv("TG_BOT_TOKEN"),
-		DBPath:        "products.db",
-		AdminLogin:    "admin",
-		AdminPassword: "1234",
-		WebUrl:        "http://188.226.62.78:8080",
-		WebPort:       ":8080",
-		UploadDir:     "./uploads",
+		DBPath:        os.Getenv("DBPATH"),
+		AdminLogin:    os.Getenv("ADMINLOGIN"),
+		AdminPassword: os.Getenv("ADMINPASSWORD"),
+		WebUrl:        os.Getenv("WEBURL"),
+		WebPort:       os.Getenv("WEBPORT"),
+		UploadDir:     os.Getenv("UPLOADDIR"),
 	}
 }
