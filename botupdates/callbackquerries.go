@@ -86,20 +86,26 @@ func (h *Handler) product_description(callback *tgbotapi.CallbackQuery) {
 }
 
 func (h *Handler) cart_add(callback *tgbotapi.CallbackQuery) {
-	id, _ := strconv.Atoi(strings.TrimPrefix(callback.Data, "cart_add_"))
+	id, _ := strconv.ParseInt(strings.TrimPrefix(callback.Data, "cart_add_"), 10, 64)
 	err := h.storage.AddToCart(callback.From.ID, id, 1)
 	if err != nil {
 		log.Println(err)
-		h.bot.Send(tgbotapi.NewMessage(callback.From.ID, "something go wrong"))
+		h.callbackAnswer(callback, err.Error())
+	} else {
+		h.callbackAnswer(callback, "done")
 	}
-	h.callbackAnswer(callback, "done")
 }
 
 func (h *Handler) cart_menu_order(callback *tgbotapi.CallbackQuery) {
-	h.storage.ClearCart(callback.From.ID)
-	editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "заказ оформлен")
-	h.bot.Send(editMsg)
-	h.callbackAnswer(callback, "done")
+	err := h.storage.Order(callback.From.ID)
+	if err != nil {
+		log.Println(err)
+		h.callbackAnswer(callback, err.Error())
+	} else {
+		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "заказ оформлен")
+		h.bot.Send(editMsg)
+		h.callbackAnswer(callback, "done")
+	}
 }
 
 func (h *Handler) cart_menu_clear_all(callback *tgbotapi.CallbackQuery) {
