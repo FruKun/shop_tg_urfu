@@ -32,7 +32,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/add", h.basicAuth(h.AddForm))
 	mux.HandleFunc("/admin/add/product", h.basicAuth(h.AddProduct))
 	mux.HandleFunc("/admin/delete", h.basicAuth(h.DeleteProduct))
-
+	mux.HandleFunc("/admin/edit", h.basicAuth(h.EditForm))
+	mux.HandleFunc("/admin/edit/product", h.basicAuth(h.UpdateProduct))
+	mux.HandleFunc("/admin/edit/remove-image", h.basicAuth(h.RemoveImage))
 	fileServer := http.FileServer(http.Dir(h.config.UploadDir))
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fileServer))
 }
@@ -68,7 +70,6 @@ func (h *Handler) AddForm(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) AddProduct(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
-
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, "Файл слишком большой (макс. 10 МБ)", http.StatusBadRequest)
 		return
@@ -109,7 +110,7 @@ func (h *Handler) AddProduct(w http.ResponseWriter, r *http.Request) {
 
 		dst, err := os.Create(filePath)
 		if err != nil {
-			http.Error(w, "Ошибка сохранения файла", http.StatusInternalServerError)
+			http.Error(w, "Ошибка создания файла", http.StatusInternalServerError)
 			return
 		}
 		defer dst.Close()
@@ -159,4 +160,131 @@ func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Redirect(w, r, "/admin/dashboard", http.StatusSeeOther)
+}
+
+func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Неверный ID", http.StatusBadRequest)
+		return
+	}
+
+	product, err := h.storage.GetProduct(id)
+	if err != nil {
+		http.Error(w, "Товар не найден", http.StatusNotFound)
+		return
+	}
+
+	tmpl := template.Must(template.New("edit").Parse(editTemplate))
+	tmpl.Execute(w, product)
+}
+
+func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, "Файл слишком большой (макс. 10 МБ)", http.StatusBadRequest)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Некорректный ID", http.StatusBadRequest)
+		return
+	}
+
+	product, err := h.storage.GetProduct(id)
+	if err != nil {
+		http.Error(w, "Товар не найден", http.StatusNotFound)
+		return
+	}
+
+	product.Name = r.FormValue("name")
+	product.Description = r.FormValue("description")
+	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
+	if err != nil {
+		http.Error(w, "Некорректная цена", http.StatusBadRequest)
+		return
+	}
+	product.Price = price
+
+	quantity, err := strconv.Atoi(r.FormValue("quantity"))
+	if err != nil {
+		http.Error(w, "Некорректное количество", http.StatusBadRequest)
+		return
+	}
+	product.Quantity = quantity
+
+	file, header, err := r.FormFile("image")
+	if err == nil {
+		defer file.Close()
+
+		ext := strings.ToLower(filepath.Ext(header.Filename))
+		if ext != ".jpg" && ext != ".jpeg" && ext != ".png" {
+			http.Error(w, "Допустимы только изображения (jpg, jpeg, png)", http.StatusBadRequest)
+			return
+		}
+
+		fileName := fmt.Sprintf("%d_%d%s", time.Now().UnixNano(), rand.Int31n(999999), ext)
+		filePath := filepath.Join(h.config.UploadDir, fileName)
+
+		if err := os.MkdirAll(h.config.UploadDir, 0755); err != nil {
+			http.Error(w, "Ошибка сервера", http.StatusInternalServerError)
+			return
+		}
+
+		dst, err := os.Create(filePath)
+		if err != nil {
+			http.Error(w, "Ошибка сооздания файла", http.StatusInternalServerError)
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, file); err != nil {
+			http.Error(w, "Ошибка копирования файла", http.StatusInternalServerError)
+			return
+		}
+
+		if product.ImageUrl != "" && strings.HasPrefix(product.ImageUrl, "/uploads/") {
+			os.Remove("." + product.ImageUrl)
+		}
+
+		product.ImageUrl = "/uploads/" + fileName
+
+	}
+
+	if err := h.storage.UpdateProduct(product); err != nil {
+		http.Error(w, "Ошибка обновления товара", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/dashboard", http.StatusSeeOther)
+}
+
+func (h *Handler) RemoveImage(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Неверный ID", http.StatusBadRequest)
+		return
+	}
+
+	product, err := h.storage.GetProduct(id)
+	if err != nil {
+		http.Error(w, "Товар не найден", http.StatusNotFound)
+		return
+	}
+
+	if product.ImageUrl != "" && strings.HasPrefix(product.ImageUrl, "/uploads/") {
+		os.Remove("." + product.ImageUrl)
+	}
+
+	product.ImageUrl = ""
+	if err := h.storage.UpdateProduct(product); err != nil {
+		http.Error(w, "Ошибка обновления товара", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/edit?id="+idStr, http.StatusSeeOther)
 }

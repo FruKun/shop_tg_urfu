@@ -17,14 +17,13 @@ func (h *Handler) callbackAnswer(callback *tgbotapi.CallbackQuery, str string) {
 
 }
 func (h *Handler) catalogPage(callback *tgbotapi.CallbackQuery) {
-	page, _ := strconv.Atoi(strings.TrimPrefix(callback.Data, "catalog_page_"))
-	products, err := h.storage.GetAllProduct()
-
 	var msg tgbotapi.MessageConfig
 	msg.ReplyMarkup = keyboard.MainMenu()
 
+	page, _ := strconv.Atoi(strings.TrimPrefix(callback.Data, "catalog_page_"))
+
+	products, err := h.storage.GetAllProduct()
 	if err != nil {
-		log.Println(err)
 		msg = tgbotapi.NewMessage(callback.Message.Chat.ID, "ошибка загрузки")
 		h.bot.Send(msg)
 		return
@@ -71,18 +70,21 @@ func (h *Handler) product_description(callback *tgbotapi.CallbackQuery) {
 	text := fmt.Sprintf("%s\nЦена: %.2f руб.\n%s\nВ наличии: %d\n\n",
 		product.Name, product.Price, product.Description, product.Quantity)
 
-	var path string
 	if product.ImageUrl == "" {
-		path = "./uploads/not_found.jpg"
+		msg := tgbotapi.NewMessage(callback.Message.Chat.ID, text)
+		msg.ReplyMarkup = keyboard.ProductCartAddKeyboard(Id)
+		h.bot.Send(msg)
+		h.callbackAnswer(callback, "done")
+
 	} else {
-		path = "." + product.ImageUrl
+		path := "." + product.ImageUrl
+		msg := tgbotapi.NewPhoto(callback.Message.Chat.ID, tgbotapi.FilePath(path))
+		msg.Caption = text
+		msg.ReplyMarkup = keyboard.ProductCartAddKeyboard(Id)
+		h.bot.Send(msg)
+		h.callbackAnswer(callback, "done")
 	}
 
-	msg := tgbotapi.NewPhoto(callback.Message.Chat.ID, tgbotapi.FilePath(path))
-	msg.Caption = text
-	msg.ReplyMarkup = keyboard.ProductCartAddKeyboard(Id)
-	h.bot.Send(msg)
-	h.callbackAnswer(callback, "done")
 }
 
 func (h *Handler) cart_add(callback *tgbotapi.CallbackQuery) {

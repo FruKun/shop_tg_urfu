@@ -51,11 +51,10 @@ func (h *Handler) cart(message *tgbotapi.Message) {
 }
 
 func (h *Handler) catalog(message *tgbotapi.Message, page int) {
-	products, err := h.storage.GetAllProduct()
-
 	var msg tgbotapi.MessageConfig
 	msg.ReplyMarkup = keyboard.MainMenu()
 
+	products, err := h.storage.GetAllProduct()
 	if err != nil {
 		log.Println(err)
 		msg = tgbotapi.NewMessage(message.Chat.ID, "ошибка загрузки")
