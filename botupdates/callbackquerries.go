@@ -2,7 +2,6 @@ package botupdates
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 
@@ -12,10 +11,11 @@ import (
 
 func (h *Handler) callbackAnswer(callback *tgbotapi.CallbackQuery, str string) {
 	if _, err := h.bot.Request(tgbotapi.NewCallback(callback.ID, str)); err != nil {
-		log.Println(err)
+		h.logger.Error("%s", err)
 	}
 
 }
+
 func (h *Handler) catalogPage(callback *tgbotapi.CallbackQuery) {
 	var msg tgbotapi.MessageConfig
 	msg.ReplyMarkup = keyboard.MainMenu()
@@ -25,12 +25,14 @@ func (h *Handler) catalogPage(callback *tgbotapi.CallbackQuery) {
 	products, err := h.storage.GetAllProduct()
 	if err != nil {
 		msg = tgbotapi.NewMessage(callback.Message.Chat.ID, "ошибка загрузки")
+		h.callbackAnswer(callback, "ошибка загрузки")
 		h.bot.Send(msg)
 		return
 	}
 
 	if len(products) == 0 {
 		msg = tgbotapi.NewMessage(callback.Message.Chat.ID, "товаров нет")
+		h.callbackAnswer(callback, "товаров нет")
 		h.bot.Send(msg)
 		return
 	}
@@ -64,7 +66,8 @@ func (h *Handler) product_description(callback *tgbotapi.CallbackQuery) {
 
 	product, err := h.storage.GetProduct(Id)
 	if err != nil {
-		h.callbackAnswer(callback, "что-то пошло не так")
+		h.callbackAnswer(callback, "товара не существует")
+		return
 	}
 
 	text := fmt.Sprintf("%s\nЦена: %.2f руб.\n%s\nВ наличии: %d\n\n",
@@ -91,7 +94,6 @@ func (h *Handler) cart_add(callback *tgbotapi.CallbackQuery) {
 	id, _ := strconv.ParseInt(strings.TrimPrefix(callback.Data, "cart_add_"), 10, 64)
 	err := h.storage.AddToCart(callback.From.ID, id, 1)
 	if err != nil {
-		log.Println(err)
 		h.callbackAnswer(callback, err.Error())
 	} else {
 		h.callbackAnswer(callback, "done")
@@ -101,7 +103,6 @@ func (h *Handler) cart_add(callback *tgbotapi.CallbackQuery) {
 func (h *Handler) cart_menu_order(callback *tgbotapi.CallbackQuery) {
 	err := h.storage.Order(callback.From.ID)
 	if err != nil {
-		log.Println(err)
 		h.callbackAnswer(callback, err.Error())
 	} else {
 		editMsg := tgbotapi.NewEditMessageText(callback.Message.Chat.ID, callback.Message.MessageID, "заказ оформлен")

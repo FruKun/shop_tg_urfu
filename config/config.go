@@ -10,6 +10,8 @@ type Config struct {
 	WebUrl        string
 	WebPort       string
 	UploadDir     string
+	LogLevel      string
+	LogDir        string
 }
 
 func New() *Config {
@@ -21,5 +23,7 @@ func New() *Config {
 		WebUrl:        os.Getenv("WEBURL"),
 		WebPort:       os.Getenv("WEBPORT"),
 		UploadDir:     os.Getenv("UPLOADDIR"),
+		LogLevel:      os.Getenv("LOGLEVEL"),
+		LogDir:        os.Getenv("LOGDIR"),
 	}
 }

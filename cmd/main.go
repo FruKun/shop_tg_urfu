@@ -1,12 +1,16 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/FruKun/shop_tg_bot_urfu/botupdates"
 	"github.com/FruKun/shop_tg_bot_urfu/config"
 	"github.com/FruKun/shop_tg_bot_urfu/db"
+	"github.com/FruKun/shop_tg_bot_urfu/logger"
 	"github.com/FruKun/shop_tg_bot_urfu/webadmin"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -14,19 +18,42 @@ import (
 func main() {
 	cfg := config.New()
 
-	storage, err := db.New(cfg.DBPath)
+	writer := io.Writer(os.Stdout)
+	if cfg.LogDir != "" {
+		file, err := os.OpenFile(cfg.LogDir, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Panic(err)
+		}
+		writer = io.MultiWriter(writer, file)
+	}
+	var loglvl string
+	if cfg.LogLevel != "" {
+		loglvl = cfg.LogLevel
+	} else {
+		loglvl = "DEBUG"
+	}
+	baseLogger := logger.New(writer, loglvl)
+	mainLogger := baseLogger.NewModule("main")
+
+	mainLogger.Info("start database dbpath: %s", cfg.DBPath)
+	storage, err := db.New(cfg.DBPath, baseLogger.NewModule("db"))
 	if err != nil {
-		log.Panic(err)
+		mainLogger.Panic("%s", err)
 	}
 
+	mainLogger.Info("start bot")
 	bot, err := tgbotapi.NewBotAPI(cfg.BotToken)
 	if err != nil {
-		log.Panic(err)
+		mainLogger.Panic("%s", err)
 	}
 
-	bot.Debug = true
+	bot.Debug = false
+	if strings.ToUpper(loglvl) == "DEBUG" {
+		bot.Debug = true
+	}
 
-	handler := botupdates.New(bot, storage, cfg)
+	mainLogger.Info("start handle update")
+	handler := botupdates.New(bot, storage, cfg, baseLogger.NewModule("botupdates"))
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
@@ -38,7 +65,7 @@ func main() {
 		}
 	}()
 
-	adminHandler := webadmin.New(storage, cfg)
+	adminHandler := webadmin.New(storage, cfg, baseLogger.NewModule("webadmin"))
 	mux := http.NewServeMux()
 	adminHandler.RegisterRoutes(mux)
 
@@ -46,9 +73,10 @@ func main() {
 		http.Redirect(w, r, "/admin/dashboard", http.StatusFound)
 	})
 
+	mainLogger.Info("start web")
 	go func() {
 		if err := http.ListenAndServe(cfg.WebPort, mux); err != nil {
-			log.Panic(err)
+			mainLogger.Panic("%s", err)
 		}
 	}()
 	select {}

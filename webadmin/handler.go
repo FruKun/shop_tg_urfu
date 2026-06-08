@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -15,16 +14,18 @@ import (
 
 	"github.com/FruKun/shop_tg_bot_urfu/config"
 	"github.com/FruKun/shop_tg_bot_urfu/db"
+	"github.com/FruKun/shop_tg_bot_urfu/logger"
 	"github.com/FruKun/shop_tg_bot_urfu/models"
 )
 
 type Handler struct {
 	storage *db.Database
 	config  *config.Config
+	logger  *logger.Logger
 }
 
-func New(storage *db.Database, cfg *config.Config) *Handler {
-	return &Handler{storage: storage, config: cfg}
+func New(storage *db.Database, cfg *config.Config, logger *logger.Logger) *Handler {
+	return &Handler{storage: storage, config: cfg, logger: logger}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
@@ -54,7 +55,6 @@ func (h *Handler) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	products, err := h.storage.GetAllProduct()
 	if err != nil {
-		log.Println(err)
 		http.Error(w, "Ошибка загрузки товаров", http.StatusInternalServerError)
 		return
 	}
@@ -71,6 +71,7 @@ func (h *Handler) AddForm(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) AddProduct(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Файл слишком большой (макс. 10 МБ)", http.StatusBadRequest)
 		return
 	}
@@ -79,12 +80,14 @@ func (h *Handler) AddProduct(w http.ResponseWriter, r *http.Request) {
 	description := r.FormValue("description")
 	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "некорректная цена", http.StatusBadRequest)
 		return
 	}
 
 	quantity, err := strconv.Atoi(r.FormValue("quantity"))
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "некорректное количество", http.StatusBadRequest)
 		return
 	}
@@ -122,6 +125,8 @@ func (h *Handler) AddProduct(w http.ResponseWriter, r *http.Request) {
 
 		imageUrl = "/uploads/" + fileName
 
+	} else {
+		h.logger.Warn("%s", err)
 	}
 
 	product := &models.Product{
@@ -144,6 +149,7 @@ func (h *Handler) DeleteProduct(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Неверный ID", http.StatusBadRequest)
 		return
 	}
@@ -166,6 +172,7 @@ func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Неверный ID", http.StatusBadRequest)
 		return
 	}
@@ -183,6 +190,7 @@ func (h *Handler) EditForm(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Файл слишком большой (макс. 10 МБ)", http.StatusBadRequest)
 		return
 	}
@@ -190,6 +198,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	idStr := r.FormValue("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Некорректный ID", http.StatusBadRequest)
 		return
 	}
@@ -204,6 +213,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 	product.Description = r.FormValue("description")
 	price, err := strconv.ParseFloat(r.FormValue("price"), 64)
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Некорректная цена", http.StatusBadRequest)
 		return
 	}
@@ -211,6 +221,7 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 	quantity, err := strconv.Atoi(r.FormValue("quantity"))
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Некорректное количество", http.StatusBadRequest)
 		return
 	}
@@ -230,18 +241,21 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		filePath := filepath.Join(h.config.UploadDir, fileName)
 
 		if err := os.MkdirAll(h.config.UploadDir, 0755); err != nil {
+			h.logger.Error("%s", err)
 			http.Error(w, "Ошибка сервера", http.StatusInternalServerError)
 			return
 		}
 
 		dst, err := os.Create(filePath)
 		if err != nil {
+			h.logger.Error("%s", err)
 			http.Error(w, "Ошибка сооздания файла", http.StatusInternalServerError)
 			return
 		}
 		defer dst.Close()
 
 		if _, err := io.Copy(dst, file); err != nil {
+			h.logger.Error("%s", err)
 			http.Error(w, "Ошибка копирования файла", http.StatusInternalServerError)
 			return
 		}
@@ -252,6 +266,8 @@ func (h *Handler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 
 		product.ImageUrl = "/uploads/" + fileName
 
+	} else {
+		h.logger.Error("%s", err)
 	}
 
 	if err := h.storage.UpdateProduct(product); err != nil {
@@ -266,6 +282,7 @@ func (h *Handler) RemoveImage(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
+		h.logger.Warn("%s", err)
 		http.Error(w, "Неверный ID", http.StatusBadRequest)
 		return
 	}

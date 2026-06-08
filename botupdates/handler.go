@@ -5,6 +5,7 @@ import (
 
 	"github.com/FruKun/shop_tg_bot_urfu/config"
 	"github.com/FruKun/shop_tg_bot_urfu/db"
+	"github.com/FruKun/shop_tg_bot_urfu/logger"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -13,13 +14,15 @@ type Handler struct {
 	bot     *tgbotapi.BotAPI
 	storage *db.Database
 	config  *config.Config
+	logger  *logger.Logger
 }
 
-func New(bot *tgbotapi.BotAPI, storage *db.Database, cfg *config.Config) *Handler {
+func New(bot *tgbotapi.BotAPI, storage *db.Database, cfg *config.Config, logger *logger.Logger) *Handler {
 	return &Handler{
 		bot:     bot,
 		storage: storage,
 		config:  cfg,
+		logger:  logger,
 	}
 }
 
@@ -36,8 +39,8 @@ func (h *Handler) handleMessage(message *tgbotapi.Message) {
 		h.catalog(message, 0)
 	case "/cart", "корзина":
 		h.cart(message)
-	case "/help", "/start":
-		h.help(message)
+	case "/start", "старт":
+		h.catalog(message, 0)
 	default:
 		h.help(message)
 	}

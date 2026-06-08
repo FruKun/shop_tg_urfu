@@ -2,14 +2,17 @@ package db
 
 import (
 	"database/sql"
+
+	"github.com/FruKun/shop_tg_bot_urfu/logger"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 type Database struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *logger.Logger
 }
 
-func New(dbPath string) (*Database, error) {
+func New(dbPath string, logger *logger.Logger) (*Database, error) {
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
@@ -17,7 +20,7 @@ func New(dbPath string) (*Database, error) {
 	if err := createTables(db); err != nil {
 		return nil, err
 	}
-	return &Database{db: db}, nil
+	return &Database{db: db, logger: logger}, nil
 }
 
 func createTables(db *sql.DB) error {

@@ -2,7 +2,6 @@ package botupdates
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/FruKun/shop_tg_bot_urfu/keyboard"
@@ -20,7 +19,6 @@ func (h *Handler) cart(message *tgbotapi.Message) {
 	var msg tgbotapi.MessageConfig
 	msg.ReplyMarkup = keyboard.MainMenu()
 	if err != nil {
-		log.Println(err)
 		msg = tgbotapi.NewMessage(message.Chat.ID, "error")
 		h.bot.Send(msg)
 		return
@@ -37,7 +35,6 @@ func (h *Handler) cart(message *tgbotapi.Message) {
 	for i, item := range items {
 		product, err := h.storage.GetProduct(item.ProductID)
 		if err != nil {
-			log.Println(err)
 			continue
 		}
 		subtotal := product.Price * float64(item.Quantity)
@@ -56,7 +53,6 @@ func (h *Handler) catalog(message *tgbotapi.Message, page int) {
 
 	products, err := h.storage.GetAllProduct()
 	if err != nil {
-		log.Println(err)
 		msg = tgbotapi.NewMessage(message.Chat.ID, "ошибка загрузки")
 		h.bot.Send(msg)
 		return

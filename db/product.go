@@ -10,6 +10,7 @@ func (s *Database) GetProduct(id int64) (*models.Product, error) {
 		"SELECT id, name, description, price, quantity, image_url FROM products WHERE id=?", id,
 	).Scan(&product.Id, &product.Name, &product.Description, &product.Price, &product.Quantity, &product.ImageUrl)
 	if err != nil {
+		s.logger.Error("product id = id, error: %s", err)
 		return nil, err
 	}
 	return product, nil
@@ -20,7 +21,12 @@ func (s *Database) CreateProduct(product *models.Product) error {
 		"INSERT INTO products (name, description, price, quantity, image_url) VALUES (?,?,?,?,?)",
 		product.Name, product.Description, product.Price, product.Quantity, product.ImageUrl,
 	)
-	return err
+	if err != nil {
+		s.logger.Error("%s", err)
+		return err
+	}
+	s.logger.Debug("%s, %s, %f, %d, %s", product.Name, product.Description, product.Price, product.Quantity, product.ImageUrl)
+	return nil
 }
 
 func (s *Database) UpdateProduct(product *models.Product) error {
@@ -28,7 +34,12 @@ func (s *Database) UpdateProduct(product *models.Product) error {
 		"UPDATE products SET name=?, description=?, price=?, quantity=?, image_url=? WHERE id=?",
 		product.Name, product.Description, product.Price, product.Quantity, product.ImageUrl, product.Id,
 	)
-	return err
+	if err != nil {
+		s.logger.Error("%s", err)
+		return err
+	}
+	s.logger.Debug("created product: %s, %s, %f, %d, %s", product.Name, product.Description, product.Price, product.Quantity, product.ImageUrl)
+	return nil
 }
 
 func (s *Database) GetAllProduct() ([]models.Product, error) {
@@ -36,6 +47,7 @@ func (s *Database) GetAllProduct() ([]models.Product, error) {
 		"SELECT id, name, description, price, quantity, image_url FROM products",
 	)
 	if err != nil {
+		s.logger.Error("%s", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -47,19 +59,16 @@ func (s *Database) GetAllProduct() ([]models.Product, error) {
 		}
 		products = append(products, f)
 	}
+	s.logger.Debug("created products: %d", len(products))
 	return products, nil
 }
 
 func (s *Database) DeleteProduct(id int64) error {
 	_, err := s.db.Exec("DELETE FROM products WHERE id = ?", id)
-	return err
-}
-
-func (s *Database) IsAdmin(userID int64) (bool, error) {
-	var exists bool
-	err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM admins WHERE user_id = ?)", userID).Scan(&exists)
 	if err != nil {
-		return false, err
+		s.logger.Error("%s", err)
+		return err
 	}
-	return exists, nil
+	s.logger.Debug("deleted product: %d", id)
+	return nil
 }

@@ -9,6 +9,7 @@ import (
 func (s *Database) GetCart(userID int64) ([]models.CartItem, error) {
 	rows, err := s.db.Query("SELECT product_id, quantity FROM cart_items WHERE user_id=?", userID)
 	if err != nil {
+		s.logger.Error("%s", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -22,17 +23,24 @@ func (s *Database) GetCart(userID int64) ([]models.CartItem, error) {
 		}
 		items = append(items, item)
 	}
+	s.logger.Debug("Cart items: %d", len(items))
 	return items, nil
 }
 
 func (s *Database) ClearCart(userID int64) error {
 	_, err := s.db.Exec("DELETE FROM cart_items WHERE user_id=?", userID)
-	return err
+	if err != nil {
+		s.logger.Error("%s", err)
+		return err
+	}
+	s.logger.Debug("Clear Cart user Id = %d", userID)
+	return nil
 }
 
 func (s *Database) AddToCart(userID int64, productID int64, quantity int) error {
 	tx, err := s.db.Begin()
 	if err != nil {
+		s.logger.Error("%s", err)
 		return fmt.Errorf("internal error %w", err)
 	}
 	defer tx.Rollback()
@@ -61,6 +69,7 @@ func (s *Database) AddToCart(userID int64, productID int64, quantity int) error 
 		userID, productID, userID, productID, quantity,
 	)
 	if err != nil {
+		s.logger.Warn("%s", err)
 		return fmt.Errorf("ошибка добавления в корзину %w", err)
 	}
 
@@ -70,12 +79,14 @@ func (s *Database) AddToCart(userID int64, productID int64, quantity int) error 
 func (s *Database) Order(UserId int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
+		s.logger.Error("%s", err)
 		return fmt.Errorf("internal error: %w", err)
 	}
 	defer tx.Rollback()
 
 	rows, err := tx.Query("SELECT product_id, quantity FROM cart_items WHERE user_id=?", UserId)
 	if err != nil {
+		s.logger.Warn("%s", err)
 		return fmt.Errorf("ошибка получения корзины: %w", err)
 	}
 	defer rows.Close()
@@ -84,6 +95,7 @@ func (s *Database) Order(UserId int64) error {
 	for rows.Next() {
 		var cartProduct models.CartItem
 		if err := rows.Scan(&cartProduct.ProductID, &cartProduct.Quantity); err != nil {
+			s.logger.Warn("%s", err)
 			return fmt.Errorf("ошибка получения корзины: %w", err)
 		}
 
@@ -117,6 +129,7 @@ func (s *Database) Order(UserId int64) error {
 
 	_, err = tx.Exec("DELETE FROM cart_items WHERE user_id=?", UserId)
 	if err != nil {
+		s.logger.Warn("%s", err)
 		return fmt.Errorf("ошибка очистки корзины: %w", err)
 	}
 
