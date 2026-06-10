@@ -25,13 +25,14 @@ func main() {
 			log.Panic(err)
 		}
 		writer = io.MultiWriter(writer, file)
+		defer file.Close()
 	}
-	var loglvl string
+
+	loglvl := "DEBUG"
 	if cfg.LogLevel != "" {
 		loglvl = cfg.LogLevel
-	} else {
-		loglvl = "DEBUG"
 	}
+
 	baseLogger := logger.New(writer, loglvl)
 	mainLogger := baseLogger.NewModule("main")
 
@@ -41,7 +42,7 @@ func main() {
 		mainLogger.Panic("%s", err)
 	}
 
-	mainLogger.Info("start bot")
+	mainLogger.Info("start bot, Bot Token: %s", string([]rune(cfg.BotToken)[len(cfg.BotToken)-5:]))
 	bot, err := tgbotapi.NewBotAPI(cfg.BotToken)
 	if err != nil {
 		mainLogger.Panic("%s", err)

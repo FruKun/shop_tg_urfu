@@ -41,7 +41,7 @@ func (s *Database) AddToCart(userID int64, productID int64, quantity int) error 
 	tx, err := s.db.Begin()
 	if err != nil {
 		s.logger.Error("%s", err)
-		return fmt.Errorf("internal error %w", err)
+		return fmt.Errorf("internal error")
 	}
 	defer tx.Rollback()
 
@@ -70,7 +70,7 @@ func (s *Database) AddToCart(userID int64, productID int64, quantity int) error 
 	)
 	if err != nil {
 		s.logger.Warn("%s", err)
-		return fmt.Errorf("ошибка добавления в корзину %w", err)
+		return fmt.Errorf("ошибка добавления в корзину")
 	}
 
 	return tx.Commit()
@@ -80,14 +80,14 @@ func (s *Database) Order(UserId int64) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		s.logger.Error("%s", err)
-		return fmt.Errorf("internal error: %w", err)
+		return fmt.Errorf("internal error")
 	}
 	defer tx.Rollback()
 
 	rows, err := tx.Query("SELECT product_id, quantity FROM cart_items WHERE user_id=?", UserId)
 	if err != nil {
 		s.logger.Warn("%s", err)
-		return fmt.Errorf("ошибка получения корзины: %w", err)
+		return fmt.Errorf("ошибка получения корзины")
 	}
 	defer rows.Close()
 
@@ -96,7 +96,7 @@ func (s *Database) Order(UserId int64) error {
 		var cartProduct models.CartItem
 		if err := rows.Scan(&cartProduct.ProductID, &cartProduct.Quantity); err != nil {
 			s.logger.Warn("%s", err)
-			return fmt.Errorf("ошибка получения корзины: %w", err)
+			return fmt.Errorf("ошибка получения корзины")
 		}
 
 		var productQuantity int
@@ -117,7 +117,8 @@ func (s *Database) Order(UserId int64) error {
 			cartProduct.Quantity, cartProduct.ProductID,
 		)
 		if err != nil {
-			return fmt.Errorf("ошибка списания товара id=%d\n%w", cartProduct.ProductID, err)
+			s.logger.Error("%s", err)
+			return fmt.Errorf("ошибка списания товара id=%d", cartProduct.ProductID)
 		}
 
 		itemsCount++
@@ -130,7 +131,7 @@ func (s *Database) Order(UserId int64) error {
 	_, err = tx.Exec("DELETE FROM cart_items WHERE user_id=?", UserId)
 	if err != nil {
 		s.logger.Warn("%s", err)
-		return fmt.Errorf("ошибка очистки корзины: %w", err)
+		return fmt.Errorf("ошибка очистки корзины")
 	}
 
 	return tx.Commit()
