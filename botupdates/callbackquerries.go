@@ -22,10 +22,11 @@ func (h *Handler) catalogPage(callback *tgbotapi.CallbackQuery) {
 
 	page, _ := strconv.Atoi(strings.TrimPrefix(callback.Data, "catalog_page_"))
 
-	products, err := h.storage.GetAllProduct()
+	itemsPerPage := 5
+	products, total, err := h.storage.GetPaginatedProducts(itemsPerPage, page)
 	if err != nil {
-		msg = tgbotapi.NewMessage(callback.Message.Chat.ID, "ошибка загрузки")
-		h.callbackAnswer(callback, "ошибка загрузки")
+		msg = tgbotapi.NewMessage(callback.Message.Chat.ID, err.Error())
+		h.callbackAnswer(callback, err.Error())
 		h.bot.Send(msg)
 		return
 	}
@@ -37,18 +38,10 @@ func (h *Handler) catalogPage(callback *tgbotapi.CallbackQuery) {
 		return
 	}
 
-	itemsPerPage := 5
-	totalPages := (len(products) + itemsPerPage - 1) / itemsPerPage
-
-	start := min(page*itemsPerPage, len(products))
-	end := min(start+itemsPerPage, len(products))
-	if start == end {
-		start = max(start-itemsPerPage, 0)
-		page = max(page-1, 0)
-	}
+	totalPages := (total + itemsPerPage - 1) / itemsPerPage
 
 	var text strings.Builder
-	for i, product := range products[start:end] {
+	for i, product := range products {
 		fmt.Fprintf(&text, "%d. %s\nЦена: %.2f руб.\n%s\nВ наличии: %d\n\n",
 			i+1, product.Name, product.Price, product.Description, product.Quantity)
 	}

@@ -39,7 +39,7 @@ func CatalogMenu(page int, totalPages int, products []models.Product) tgbotapi.I
 			tgbotapi.NewInlineKeyboardButtonData("Вперед ➡️", fmt.Sprintf("catalog_page_%d", page+1)),
 		})
 		buttons = append(buttons, getProductsDescriptionKeyboard(products))
-	case totalPages:
+	case totalPages - 1:
 		buttons = append(buttons, []tgbotapi.InlineKeyboardButton{
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Назад", fmt.Sprintf("catalog_page_%d", page-1)),
 			tgbotapi.NewInlineKeyboardButtonData("Вперед ➡️", fmt.Sprintf("catalog_page_%d", 0)),

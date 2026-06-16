@@ -51,31 +51,23 @@ func (h *Handler) catalog(message *tgbotapi.Message, page int) {
 	var msg tgbotapi.MessageConfig
 	msg.ReplyMarkup = keyboard.MainMenu()
 
-	products, err := h.storage.GetAllProduct()
+	itemsPerPage := 5
+	products, total, err := h.storage.GetPaginatedProducts(itemsPerPage, page)
 	if err != nil {
-		msg = tgbotapi.NewMessage(message.Chat.ID, "ошибка загрузки")
+		msg = tgbotapi.NewMessage(message.Chat.ID, err.Error())
 		h.bot.Send(msg)
 		return
 	}
-
 	if len(products) == 0 {
 		msg = tgbotapi.NewMessage(message.Chat.ID, "товаров нет")
 		h.bot.Send(msg)
 		return
 	}
 
-	itemsPerPage := 5
-	totalPages := (len(products) + itemsPerPage - 1) / itemsPerPage
-
-	start := page * itemsPerPage
-	end := min(start+itemsPerPage, len(products))
-	if start == end {
-		start = max(start-itemsPerPage, 0)
-		page = max(page-1, 0)
-	}
+	totalPages := (total + itemsPerPage - 1) / itemsPerPage
 
 	var text strings.Builder
-	for i, product := range products[start:end] {
+	for i, product := range products {
 		fmt.Fprintf(&text, "%d. %s\nЦена: %.2f руб.\n%s\nВ наличии: %d\n\n",
 			i+1, product.Name, product.Price, product.Description, product.Quantity)
 	}

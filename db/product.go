@@ -1,6 +1,8 @@
 package db
 
 import (
+	"fmt"
+
 	"github.com/FruKun/shop_tg_bot_urfu/models"
 )
 
@@ -42,9 +44,9 @@ func (s *Database) UpdateProduct(product *models.Product) error {
 	return nil
 }
 
-func (s *Database) GetAllProduct() ([]models.Product, error) {
+func (s *Database) GetAllProducts() ([]models.Product, error) {
 	rows, err := s.db.Query(
-		"SELECT id, name, description, price, quantity, image_url FROM products",
+		"SELECT id, name, description, price, quantity, image_url FROM products ORDER BY id",
 	)
 	if err != nil {
 		s.logger.Error("%s", err)
@@ -55,12 +57,50 @@ func (s *Database) GetAllProduct() ([]models.Product, error) {
 	for rows.Next() {
 		var f models.Product
 		if err := rows.Scan(&f.Id, &f.Name, &f.Description, &f.Price, &f.Quantity, &f.ImageUrl); err != nil {
+			s.logger.Error("%s", err)
 			return nil, err
 		}
 		products = append(products, f)
 	}
 	s.logger.Debug("created products: %d", len(products))
 	return products, nil
+}
+
+func (s *Database) GetPaginatedProducts(itemsPerPage int, page int) ([]models.Product, int, error) {
+	var total int
+	err := s.db.QueryRow("SELECT COUNT(*) FROM products WHERE quantity > 0").Scan(&total)
+	if err != nil {
+		s.logger.Error("%s", err)
+		return nil, 0, fmt.Errorf("ошибка базы данных")
+	}
+
+	offset := page * itemsPerPage
+	rows, err := s.db.Query(
+		`SELECT id, name, description, price, quantity, image_url
+         FROM products 
+         WHERE quantity > 0 
+         ORDER BY id 
+         LIMIT ? OFFSET ?`,
+		itemsPerPage, offset,
+	)
+	if err != nil {
+		s.logger.Error("%s", err)
+		return nil, total, fmt.Errorf("ошибка базы данных")
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var p models.Product
+		err := rows.Scan(&p.Id, &p.Name, &p.Description, &p.Price,
+			&p.Quantity, &p.ImageUrl)
+		if err != nil {
+			s.logger.Error("%s", err)
+			return nil, total, fmt.Errorf("ошибка базы данных")
+		}
+		products = append(products, p)
+	}
+	return products, total, nil
 }
 
 func (s *Database) DeleteProduct(id int64) error {

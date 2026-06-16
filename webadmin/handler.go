@@ -53,7 +53,7 @@ func (h *Handler) basicAuth(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
-	products, err := h.storage.GetAllProduct()
+	products, err := h.storage.GetAllProducts()
 	if err != nil {
 		http.Error(w, "Ошибка загрузки товаров", http.StatusInternalServerError)
 		return
