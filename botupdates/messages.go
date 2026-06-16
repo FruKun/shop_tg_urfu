@@ -9,7 +9,7 @@ import (
 )
 
 func (h *Handler) help(message *tgbotapi.Message) {
-	msg := tgbotapi.NewMessage(message.Chat.ID, "help")
+	msg := tgbotapi.NewMessage(message.Chat.ID, "доступные команды: /каталог /корзина")
 	msg.ReplyMarkup = keyboard.MainMenu()
 	h.bot.Send(msg)
 }
@@ -19,7 +19,7 @@ func (h *Handler) cart(message *tgbotapi.Message) {
 	var msg tgbotapi.MessageConfig
 	msg.ReplyMarkup = keyboard.MainMenu()
 	if err != nil {
-		msg = tgbotapi.NewMessage(message.Chat.ID, "error")
+		msg = tgbotapi.NewMessage(message.Chat.ID, "ошибка получения корзины")
 		h.bot.Send(msg)
 		return
 	}

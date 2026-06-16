@@ -11,7 +11,6 @@ func MainMenu() tgbotapi.ReplyKeyboardMarkup {
 	buttons := [][]tgbotapi.KeyboardButton{
 		{tgbotapi.NewKeyboardButton("каталог")},
 		{tgbotapi.NewKeyboardButton("корзина")},
-		{tgbotapi.NewKeyboardButton("помощь")},
 	}
 	return tgbotapi.NewReplyKeyboard(buttons...)
 }

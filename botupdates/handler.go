@@ -35,12 +35,10 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 }
 func (h *Handler) handleMessage(message *tgbotapi.Message) {
 	switch strings.ToLower(message.Text) {
-	case "/catalog", "каталог":
+	case "/catalog", "каталог", "/каталог", "/start", "старт", "/старт":
 		h.catalog(message, 0)
 	case "/cart", "корзина":
 		h.cart(message)
-	case "/start", "старт":
-		h.catalog(message, 0)
 	default:
 		h.help(message)
 	}
